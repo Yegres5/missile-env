@@ -7,5 +7,6 @@ setup(
     url='git@github.com:Yegres5/missile-env.git',
     author='Evgeny Sazhnev',
     author_email='yegres98@gmail.com',
-    license='unlicense'
+    license='unlicense',
+    packages=['missile_env']
 )
