@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    name="missile-env",
+    name="missile_env",
     version='0.0.1',
     desctiption="Private package for guided missile model",
     url='git@github.com:Yegres5/missile-env.git',
