@@ -8,5 +8,6 @@ setup(
     author='Evgeny Sazhnev',
     author_email='yegres98@gmail.com',
     license='unlicense',
-    packages=['missile_env', 'gym']
+    packages=['missile_env'],
+    install_requiers = ['gym']
 )
