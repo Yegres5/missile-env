@@ -1,7 +1,4 @@
-def check():
-    print("Works!")
-
-from gym.env.registration import register
+from gym.envs.registration import register
 
 
 register(

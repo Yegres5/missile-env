@@ -7,7 +7,7 @@ setup(
     url='git@github.com:Yegres5/missile-env.git',
     author='Evgeny Sazhnev',
     author_email='yegres98@gmail.com',
-    license='unlicense',
+    license='unlicensed',
     packages=['missile_env'],
-    install_requiers = ['gym']
+    install_requiers=['gym, numpy']
 )

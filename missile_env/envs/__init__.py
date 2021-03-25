@@ -1,1 +1,1 @@
-from missile_env.envs.missileenv_0 import MissileEnv_0
+from missile_env.envs.missileenv_0 import MissileEnv0
