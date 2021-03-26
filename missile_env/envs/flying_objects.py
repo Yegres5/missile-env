@@ -1,25 +1,25 @@
 import numpy as np
 import matplotlib as mpl
+
 mpl.use('Qt5Agg', warn=False, force=True)
 
 import matplotlib.pyplot as plt
 import sys
 
-from math import sin, cos, atan, sqrt, atan2, copysign, acos
+from math import sin, cos, atan, sqrt, atan2
 
 mpl.matplotlib_fname()
 
-dT = 0.1
-
 
 class Rocket:
-    def __init__(self, coord, euler, speed):
+    def __init__(self, coord, euler, speed, d_t):
         self._coord = np.array(coord, dtype=np.float)  # All vectors in form [X, Y, Z]
         self._overload = np.array([0, 1, 0], dtype=np.float)
         self._euler = np.array(euler, dtype=np.float)  # [Theta, Psi, Gamma]
         self._speed = speed
         self._target = None
         self._n_y_max = 20
+        self._d_t = d_t
 
     def captureTarget(self, target):
         self._target = target
@@ -37,7 +37,7 @@ class Rocket:
         return list((self._coord, self._euler, self._speed, self._overload))
 
     def step(self, action):
-        self.update(dT)
+        self.update(self._d_t)
 
     def grav_compensate(self):
 
@@ -49,8 +49,6 @@ class Rocket:
 
     def sumOverloads(self, n_pitch, n_roll):
         self._overload[1] += n_pitch
-        # delta = 0 if np.isclose(n_roll, 0) else atan(n_roll / self._overload[1])
-        # self._euler = self._euler + np.array([0, 0, delta])
         self._euler[2] += 0 if np.isclose(n_roll, 0) else atan(n_roll / self._overload[1])
         self._overload[1] = sqrt(pow(self._overload[1], 2) + pow(n_roll, 2)) * (1 if self._overload[1] > 0 else -1)
 
@@ -60,38 +58,28 @@ class Rocket:
                                  self.targetInfo[2] * sin(self.targetInfo[1][0]),
                                  -self.targetInfo[2] * cos(self.targetInfo[1][0]) * sin(self.targetInfo[1][1])])
 
-        target_speed = toSpeedCoordinateSystem(self._euler, target_speed);
-
-        # target_speed = np.array([sqrt(pow(target_speed[0], 2) + pow(target_speed[1], 2) + pow(target_speed[2], 2)),
-        #                          acos(sqrt(pow(target_speed[0], 2) + pow(target_speed[2], 2)) /
-        #                               sqrt(pow(target_speed[0], 2) +
-        #                                    pow(target_speed[1], 2) +
-        #                                    pow(target_speed[2], 2))) * copysign(target_speed[1], 1),
-        #                          atan2(-target_speed[2], target_speed[0])])
+        target_speed = toSpeedCoordinateSystem(self._euler, target_speed)
 
         return target_speed
 
     def CalculateNyPN(self):
 
-        Ky = 7
+        k_y = 7
 
-        TargetCoor = toSpeedCoordinateSystem(self._euler, self.targetInfo[0] - self._coord)
-        TargetSpeed = self.TargetSpeed()
+        target_coor = toSpeedCoordinateSystem(self._euler, self.targetInfo[0] - self._coord)
+        target_speed = self.TargetSpeed()
 
-        TargetSpeedXY = np.array([TargetSpeed[0] * cos(TargetSpeed[1]) * cos(TargetSpeed[2]),
-                                  TargetSpeed[0] * sin(TargetSpeed[1])])
+        target_speed_xy = np.array([sqrt(pow(target_speed[0], 2) + pow(target_speed[1], 2)),
+                                  atan2(target_speed[1], target_speed[0])])
 
-        TargetSpeedXY = np.array([sqrt(pow(TargetSpeedXY[0], 2) + pow(TargetSpeedXY[1], 2)),
-                                  atan2(TargetSpeedXY[1], TargetSpeedXY[0])])
+        sigma_R_XY = -atan2(target_coor[1], target_coor[0])
+        sigma_T_XY = target_speed_xy[1] - atan2(target_coor[1], target_coor[0])
 
-        sigma_R_XY = -atan2(TargetCoor[1], TargetCoor[0])
-        sigma_T_XY = TargetSpeedXY[1] - atan2(TargetCoor[1], TargetCoor[0])
+        r_XY = sqrt(pow(target_coor[0], 2) + pow(target_coor[1], 2))
 
-        r_XY = sqrt(pow(TargetCoor[0], 2) + pow(TargetCoor[1], 2))
+        d_lambda_XY = (target_speed_xy[0] * sin(sigma_T_XY) - self._speed * sin(sigma_R_XY)) / r_XY
 
-        d_lambda_XY = (TargetSpeedXY[0] * sin(sigma_T_XY) - self._speed * sin(sigma_R_XY)) / r_XY
-
-        W_XY = Ky * self._speed * d_lambda_XY
+        W_XY = k_y * self._speed * d_lambda_XY
         n_pitch = W_XY / G
 
         return n_pitch
@@ -103,28 +91,20 @@ class Rocket:
         TargetCoor = toSpeedCoordinateSystem(self._euler, self.targetInfo[0] - self._coord)
         TargetSpeed = self.TargetSpeed()
 
-        TargetSpeed = np.array([sqrt(pow(TargetSpeed[0], 2) + pow(TargetSpeed[1], 2) + pow(TargetSpeed[2], 2)),
-                                 acos(sqrt(pow(TargetSpeed[0], 2) + pow(TargetSpeed[2], 2)) /
-                                      sqrt(pow(TargetSpeed[0], 2) +
-                                           pow(TargetSpeed[1], 2) +
-                                           pow(TargetSpeed[2], 2))) * copysign(TargetSpeed[1], 1),
-                                 atan2(-TargetSpeed[2], TargetSpeed[0])])
-
-        TargetSpeedXZ = np.array([TargetSpeed[0]*cos(TargetSpeed[1]),
-                                             TargetSpeed[2]])
+        TargetSpeedXZ = np.array([sqrt(pow(TargetSpeed[0], 2) + pow(TargetSpeed[2], 2)),
+                                  atan2(-TargetSpeed[2], TargetSpeed[0])])
 
         sigma_R = -atan2(-TargetCoor[2], TargetCoor[0])
-        sigma_T = TargetSpeedXZ[1] - atan2(-TargetCoor[2],TargetCoor[0])
-        r = sqrt(pow(TargetCoor[0],2) + pow(TargetCoor[2],2))
-        d_lambda = (TargetSpeedXZ[0]*sin(sigma_T) - self._speed*sin(sigma_R))/r
-        W = -Kz*self._speed*d_lambda
-        n_roll = W/G
+        sigma_T = TargetSpeedXZ[1] - atan2(-TargetCoor[2], TargetCoor[0])
+        r = sqrt(pow(TargetCoor[0], 2) + pow(TargetCoor[2], 2))
+        d_lambda = (TargetSpeedXZ[0] * sin(sigma_T) - self._speed * sin(sigma_R)) / r
+        W = -Kz * self._speed * d_lambda
+        n_roll = W / G
 
         return n_roll
 
-
     def LimitOverload(self):
-        self._overload[1] = (self._n_y_max-1) * (1 if self._overload[1] > 0 else -1) if abs(
+        self._overload[1] = (self._n_y_max - 1) * (1 if self._overload[1] > 0 else -1) if abs(
             self._overload[1]) > (self._n_y_max - 1) else self._overload[1]
 
     def update(self, dt):
@@ -146,8 +126,6 @@ class Rocket:
         self._coord[0] += self._speed * cos(self._euler[0]) * cos(self._euler[1]) * dt
         self._coord[1] += self._speed * sin(self._euler[0]) * dt
         self._coord[2] += -self._speed * cos(self._euler[0]) * sin(self._euler[1]) * dt
-
-        # print(f"Overload = {self._overload}, Coord = {self._coord}")
 
     def destroyed(self):
         pass
@@ -233,7 +211,7 @@ def toTrajectoryCoordinateSystem(euler, vec):
     return np.dot(vec, matr).reshape(3)
 
 
-a = LA(coord=[8000, 8000, 0], speed=200, euler=[0, np.radians(180), 0])
+a = LA(coord=[4000, 4000, 2000], speed=300, euler=[0, np.radians(90), 0])
 b = Rocket(coord=[0, 0, 0], speed=400, euler=[0, 0, 0])
 b.captureTarget(a)
 
@@ -242,7 +220,7 @@ target_coor = []
 rock_overload = []
 target_speed_roc = []
 
-for i in range(5000):
+for i in range(1000):
     b.step(1)
     a.step()
 
@@ -252,11 +230,9 @@ for i in range(5000):
     target_speed_roc.append(b.TargetSpeed())
 
     if len(rock_coor) >= 2:
-        if np.sqrt(np.sum((rock_coor[-1] - target_coor[-1])**2)) > np.sqrt(np.sum((rock_coor[-2] - target_coor[-2])**2)):
+        if np.sqrt(np.sum((rock_coor[-1] - target_coor[-1]) ** 2)) > np.sqrt(
+                np.sum((rock_coor[-2] - target_coor[-2]) ** 2)):
             break
-
-    # data.append(np.vstack((b.state, a.state)))
-    # print(f"Rocket = {b.state}, Target = {a.state}")
 
 rock_coor = np.array(rock_coor)
 target_coor = np.array(target_coor)
