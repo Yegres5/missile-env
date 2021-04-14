@@ -1,38 +1,96 @@
 import numpy as np
-
-from flying_objects import Rocket, LA
-from math import copysign
+from missile_env.envs.flying_objects import Rocket, LA, ALL_NZ, ALL_POSSIBLE_ACTIONS
+import sys
+import matplotlib.pyplot as plt
 
 
 class Wrapper:
-    def __init__(self):
-        self._nz_gap = 5
-        self._rocket = Rocket()
-        self._target = LA()
+    rocket = None
+    target = None
+    d_t = 0.1
+    ny_gap = 5
 
-        self._state = np.hstack(self._target.state(), self._rocket.state)
+    def __init__(self, rocket_info, target_info):
+        self.ini_rocket_info = rocket_info
+        self.ini_target_info = target_info
+
+        self.reset()
+
+        self.distance_to_target = self.rocket.distanceToTarget
+
+    def getFullActionSet(self):
+        return ALL_POSSIBLE_ACTIONS
+
+    def getLegalOverloads(self):
+        ny = self.rocket.state[3][1] # Module of Ny
+        diff = np.sqrt(np.sum(ALL_POSSIBLE_ACTIONS ** 2, axis=1)) - ny
+        legal_n = ALL_POSSIBLE_ACTIONS[np.ix_((diff <= self.ny_gap)), :].reshape(-1, 2)
+
+        return legal_n
 
     def getLegalActionSet(self):
-        nz = self._rocket.state
-        legal_nz = ALL_NZ[abs(ALL_NZ) - nz <= self._nz_gap]
+        return self.overloadsToNumber(self.getLegalOverloads())
 
-        return legal_nz
+    def overloadsToNumber(self, overloads):
+        _, indexes = np.where([np.all(ALL_POSSIBLE_ACTIONS == i, axis=1) for i in overloads])
+        return indexes
+
+    def findClosestFromLegal(self, overload):
+        # FIXME:wrong algorithm [-12, 0] -> [-5, 3]
+        overload_list = self.getLegalOverloads()
+
+        n2_legal = np.sqrt(np.sum(overload_list ** 2, axis=1))
+        n2_overload = np.sqrt(np.sum(overload ** 2))
+
+        angles_legal = np.arctan2(overload_list[:,1], overload_list[:,0])
+
+        angle_overload = np.arctan2(overload[1], overload[0])
+
+        if angle_overload < 0:
+            angle_overload += 2*np.pi
+
+        if np.sum(angles_legal < 0):
+            angles_legal[angles_legal < 0] += 2*np.pi
+
+        diff = abs(angle_overload - angles_legal)
+        min_angle = np.min(diff)
+
+        sorted = np.sort(diff)
+        p = 5
+        r = (p/100)*(sorted.shape[0] - 1) + 1
+
+        value = sorted[int(np.ceil(r))]
+
+        # min_indexes = np.where(np.equal(diff, min_angle))[0]
+        min_indexes = np.where(np.less(diff, value))[0]
+
+        final_index = min_indexes[np.argmin(abs(n2_legal[min_indexes] - n2_overload))]
+
+        return overload_list[final_index]
+
 
     def setInt(self, param, seed2):
+        """ set seeds? """
         pass
 
+    @property
+    def state(self):
+        return np.hstack((np.array(self.rocket.state, dtype=object), np.array(self.target.state, dtype=object)))
+
     def act(self, action):
-        self._target.step()
-        self._rocket.step(action)
+        """ action: np.array 1x2 [Nz, Ny] """
+        self.target.step()
+        self.rocket.step(action)
 
-        self._state = np.hstack(self._target.state(), self._rocket.state)
+        reward = self.distance_to_target - self.rocket.distanceToTarget
+        self.distance_to_target = self.rocket.distanceToTarget
 
-        reward = 0
+        reward = self.d_t
         return reward
 
     @property
     def game_over(self):
-        if self._rocket.destroyed() or self._rocket.targetLost():
+        if self.rocket.destroyed or self.rocket.targetLost():
             return True
         return False
 
@@ -44,20 +102,17 @@ class Wrapper:
 
     def getRAM(self):
         """Current observation. Return np.array(), not image. Why RAM?"""
+        return self.state
 
-        return self._state
+    def reset(self, **info):
+        """  """
+        r_coor, r_speed, r_euler = self.ini_rocket_info
+        t_coor, t_speed, t_euler = self.ini_target_info
+        
+        if "la_coord" in info:
+            t_coor = t_coor + info["la_coord"]
 
-
-def nz_approx(x):
-    sign = copysign(1, x)
-    if -10 <= x <= 10:
-        return 1 / 2 * x
-    elif -17 <= x <= 17:
-        return (-15 + 2 * abs(x)) * sign
-    else:
-        return 20 * sign
-
-
-ran = np.arange(-18, 19)
-ALL_NZ = np.array([nz_approx(x) for x in ran])
-ACTION_MEANING = {np.where(ran == x)[0][0]: f"Nz = {nz_approx(x):.2f}" for x in ran}
+        self.rocket = Rocket(coord=r_coor, euler=r_euler, speed=r_speed, d_t=self.d_t)
+        self.target = LA(coord=t_coor, euler=t_euler, speed=t_speed, d_t=self.d_t)
+        self.rocket.captureTarget(self.target)
+        return self.state

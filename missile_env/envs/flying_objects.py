@@ -1,15 +1,6 @@
 import numpy as np
-import matplotlib as mpl
-
-mpl.use('Qt5Agg', warn=False, force=True)
-
-import matplotlib.pyplot as plt
+from math import sin, cos, atan, sqrt, atan2, copysign
 import sys
-
-from math import sin, cos, atan, sqrt, atan2
-
-mpl.matplotlib_fname()
-
 
 class Rocket:
     def __init__(self, coord, euler, speed, d_t):
@@ -20,6 +11,10 @@ class Rocket:
         self._target = None
         self._n_y_max = 20
         self._d_t = d_t
+        self._limit_angle = np.deg2rad(60)
+        self._current_overloads = np.zeros(2)
+        self._previous_distance_to_target = sys.float_info.max
+        self._explotion_distance = 100
 
     def captureTarget(self, target):
         self._target = target
@@ -34,23 +29,43 @@ class Rocket:
     @property
     def state(self):
         """ coord, euler, speed, overload """
-        return list((self._coord, self._euler, self._speed, self._overload))
+        return [np.copy(self._coord),
+                np.copy(self._euler),
+                self._speed,
+                np.copy(self._overload),
+                np.copy(self._current_overloads)]
 
     def step(self, action):
-        self.update(self._d_t)
+        """ action: np.array 1x2 [Nz, Ny] """
+        self.update(action)
 
     def grav_compensate(self):
 
         self._euler[2] = 0
         compens = np.array([0, 1, 0])
         compens = toSpeedCoordinateSystem(self._euler, compens)
+        
+        compens[0] = 0
 
-        return compens
+        self._overload = compens
 
     def sumOverloads(self, n_pitch, n_roll):
+        n_roll += self._overload[2]
+        self._current_overloads = np.array([n_roll, n_pitch])
+
         self._overload[1] += n_pitch
-        self._euler[2] += 0 if np.isclose(n_roll, 0) else atan(n_roll / self._overload[1])
+        if np.isclose(self._overload[1], 0):
+            a = 1
+            
+        if not np.isclose(n_roll, 0):
+            if np.isclose(self._overload[1], 0):
+                self._euler[2] += np.pi/2 * np.sign(n_roll)
+            else:
+                self._euler[2] += atan(n_roll / self._overload[1]) 
+            
+        # self._euler[2] += 0 if np.isclose(n_roll, 0) else atan(n_roll / self._overload[1])
         self._overload[1] = sqrt(pow(self._overload[1], 2) + pow(n_roll, 2)) * (1 if self._overload[1] > 0 else -1)
+        self._overload[2] = 0
 
     def TargetSpeed(self):
 
@@ -62,15 +77,15 @@ class Rocket:
 
         return target_speed
 
-    def CalculateNyPN(self):
+    def CalculateNyPN(self, k_y=5):
 
-        k_y = 7
-
-        target_coor = toSpeedCoordinateSystem(self._euler, self.targetInfo[0] - self._coord)
+        euler = np.copy(self._euler)
+        euler[2] = 0
+        target_coor = toSpeedCoordinateSystem(euler, self.targetInfo[0] - self._coord)
         target_speed = self.TargetSpeed()
 
         target_speed_xy = np.array([sqrt(pow(target_speed[0], 2) + pow(target_speed[1], 2)),
-                                  atan2(target_speed[1], target_speed[0])])
+                                    atan2(target_speed[1], target_speed[0])])
 
         sigma_R_XY = -atan2(target_coor[1], target_coor[0])
         sigma_T_XY = target_speed_xy[1] - atan2(target_coor[1], target_coor[0])
@@ -84,11 +99,11 @@ class Rocket:
 
         return n_pitch
 
-    def CalculateNzPN(self):
+    def CalculateNzPN(self, k_z=5):
 
-        Kz = 7
-
-        TargetCoor = toSpeedCoordinateSystem(self._euler, self.targetInfo[0] - self._coord)
+        euler = np.copy(self._euler)
+        euler[2] = 0
+        TargetCoor = toSpeedCoordinateSystem(euler, self.targetInfo[0] - self._coord)
         TargetSpeed = self.TargetSpeed()
 
         TargetSpeedXZ = np.array([sqrt(pow(TargetSpeed[0], 2) + pow(TargetSpeed[2], 2)),
@@ -98,26 +113,28 @@ class Rocket:
         sigma_T = TargetSpeedXZ[1] - atan2(-TargetCoor[2], TargetCoor[0])
         r = sqrt(pow(TargetCoor[0], 2) + pow(TargetCoor[2], 2))
         d_lambda = (TargetSpeedXZ[0] * sin(sigma_T) - self._speed * sin(sigma_R)) / r
-        W = -Kz * self._speed * d_lambda
+        W = -k_z * self._speed * d_lambda
         n_roll = W / G
 
         return n_roll
+
+    def proportionalCoefficients(self, k_z=5, k_y=5):
+        """ WARNING: call only after grav_compensate shit code """
+        return np.array([self.CalculateNzPN(k_z), self.CalculateNyPN(k_y)])
 
     def LimitOverload(self):
         self._overload[1] = (self._n_y_max - 1) * (1 if self._overload[1] > 0 else -1) if abs(
             self._overload[1]) > (self._n_y_max - 1) else self._overload[1]
 
-    def update(self, dt):
+    def update(self, action):
 
-        self._overload = self.grav_compensate()
+        self.grav_compensate()
 
-        self._overload[0] = 0  # no engine compensate
-
-        self.sumOverloads(self.CalculateNyPN(), self.CalculateNzPN())
+        self.sumOverloads(action[1], action[0])
 
         self.LimitOverload()
 
-        self.integrate(dt)
+        self.integrate(self._d_t)
 
     def integrate(self, dt):
         self._speed += (self._overload[0] - sin(self._overload[0])) * G * dt
@@ -127,24 +144,50 @@ class Rocket:
         self._coord[1] += self._speed * sin(self._euler[0]) * dt
         self._coord[2] += -self._speed * cos(self._euler[0]) * sin(self._euler[1]) * dt
 
+    @property
     def destroyed(self):
-        pass
+        if self.distanceToTarget < self._explotion_distance:
+            return True
+            # Closest distance
+            # if np.greater_equal(np.round(self._previous_distance_to_target - self.distanceToTarget, 3), 0):
+            #     self._previous_distance_to_target = self.distanceToTarget
+            # else:
+            #     return True
+
+        return False
 
     def targetLost(self):
-        pass
+
+        target_coor = self.targetInfo[0]
+
+        angle = np.arccos(abs(np.dot(target_coor, self._coord) /
+                              (np.linalg.norm(target_coor) * np.linalg.norm(self._coord))))
+
+        if angle > self._limit_angle:
+            return True
+        return False
+
+    @property
+    def distanceToTarget(self):
+        return np.linalg.norm(self.targetInfo[0] - self._coord)
 
 
 class LA:
-    def __init__(self, coord, euler, speed):
+    def __init__(self, coord, euler, speed, d_t):
         self._coord = np.array(coord, dtype=np.float)
         self._speed = speed
         self._euler = np.array(euler, dtype=np.float)
         self._overload = np.array([0, 1, 0], dtype=np.float)
+        self._d_t = d_t
+        self.t = 0
 
     @property
     def state(self):
         """ coord, euler, speed, overload """
-        return list((self._coord, self._euler, self._speed, self._overload))
+        return [np.copy(self._coord),
+                np.copy(self._euler),
+                self._speed,
+                np.copy(self._overload)]
 
     def integrate(self, dt):
         self._speed += (self._overload[0] - sin(self._overload[0])) * G * dt
@@ -155,7 +198,49 @@ class LA:
         self._coord[2] += -self._speed * cos(self._euler[0]) * sin(self._euler[1]) * dt
 
     def step(self):
-        self.integrate(dT)
+        manouver_map = self.manouver(0)
+        self.grav_compensate()
+
+        overload = 0
+
+        for index, obj in enumerate(manouver_map):
+            if self.t < manouver_map[0,0]:
+                break
+
+            if manouver_map[index, 0]< self.t < manouver_map[index + 1,0]:
+                overload = obj[1]
+                break
+
+        self.sumOverloads(0, overload)
+
+        self.integrate(self._d_t)
+        self.t += self._d_t
+
+    def grav_compensate(self):
+        self._euler[2] = 0
+        compens = np.array([0, 1, 0])
+        compens = toSpeedCoordinateSystem(self._euler, compens)
+
+        self._overload = compens
+
+    def sumOverloads(self, n_pitch, n_roll):
+        self._current_overloads = np.array([n_roll, n_pitch])
+
+        self._overload[1] += n_pitch
+        self._euler[2] += 0 if np.isclose(n_roll, 0) else atan(n_roll / self._overload[1])
+        self._overload[1] = sqrt(pow(self._overload[1], 2) + pow(n_roll, 2)) * (1 if self._overload[1] > 0 else -1)
+
+    def manouver(self, type=0):
+        if type == 0:
+            start_sec = 5
+            end_sec = 1000
+            each_sec = 5
+            nz = 3
+            time_stamps = 3 + np.arange(np.ceil((end_sec-start_sec)/each_sec)+1)*each_sec
+            overloads = np.tile(np.array([nz,-nz]), time_stamps.shape[0])[:time_stamps.shape[0]]
+            return np.array([np.array([time_stamps[i], overloads[i]]) for i in range(time_stamps.shape[0])])
+
+        return 0
 
 
 G = 9.81
@@ -211,71 +296,20 @@ def toTrajectoryCoordinateSystem(euler, vec):
     return np.dot(vec, matr).reshape(3)
 
 
-a = LA(coord=[4000, 4000, 2000], speed=300, euler=[0, np.radians(90), 0])
-b = Rocket(coord=[0, 0, 0], speed=400, euler=[0, 0, 0])
-b.captureTarget(a)
+def nz_approx(x):
+    sign = copysign(1, x)
+    if -10 <= x <= 10:
+        return 1 / 2 * x
+    elif -17 <= x <= 17:
+        return (-15 + 2 * abs(x)) * sign
+    else:
+        return 20 * sign
 
-rock_coor = []
-target_coor = []
-rock_overload = []
-target_speed_roc = []
 
-for i in range(1000):
-    b.step(1)
-    a.step()
+ran = np.arange(-18, 19)
+ALL_NZ = np.array([nz_approx(x) for x in ran])
+ACTION_MEANING = {np.where(ran == x)[0][0]: f"Nz = {nz_approx(x):.2f}" for x in ran}
 
-    rock_coor.append(np.array(b.state[0]))
-    target_coor.append(np.array(a.state[0]))
-    rock_overload.append(b.state[3])
-    target_speed_roc.append(b.TargetSpeed())
-
-    if len(rock_coor) >= 2:
-        if np.sqrt(np.sum((rock_coor[-1] - target_coor[-1]) ** 2)) > np.sqrt(
-                np.sum((rock_coor[-2] - target_coor[-2]) ** 2)):
-            break
-
-rock_coor = np.array(rock_coor)
-target_coor = np.array(target_coor)
-
-np.savetxt("0.csv", rock_coor[:, [2, 0, 1]], delimiter=",")
-np.savetxt("1.csv", target_coor[:, [2, 0, 1]], delimiter=",")
-
-# runfile('/Users/evgeny/Documents/Инст/Мага/Diploma/missile-env/missile_env/envs/3Ddraw_animate.py', wdir='/Users/evgeny/Documents/Инст/Мага/Diploma/missile-env/missile_env/envs')
-# exec(open('/Users/evgeny/Documents/Инст/Мага/Diploma/missile-env/missile_env/envs/3Ddraw_animate.py').read())
-
-# rock_overload = np.array(rock_overload).T[1]
-
-plt.figure(figsize=[16, 9])
-
-plt.subplot(221)
-tempRock = rock_coor.T[0:2]
-tempTarget = target_coor.T[0:2]
-plt.plot(tempRock[0], tempRock[1])
-plt.plot(tempTarget[0], tempTarget[1])
-
-plt.subplot(222)
-tempRock = rock_coor.T[[0, 2]]
-tempTarget = target_coor.T[[0, 2]]
-plt.plot(tempRock[0], tempRock[1])
-plt.plot(tempTarget[0], tempTarget[1])
-
-plt.subplot(223)
-plt.plot(rock_overload)
-
-plt.subplot(224)
-plt.plot(target_speed_roc)
-
-# plt.subplot(2, 1)
-# plt.title("Trace")
-# plt.plot(rock_coor.T[0:2])
-# plt.plot(target_coor.T[0:2])
-# plt.grid()
-#
-# plt.subplot(2, 2)
-# plt.title("Distance")
-# plt.plot(np.sqrt(np.sum(((target_coor - rock_coor) ** 2), axis=1)))
-# plt.grid()
-
-plt.show(block=True)
-
-sys.exit()
+temp = np.array(np.meshgrid(ALL_NZ, ALL_NZ)).T.reshape(-1, 2)
+norms = np.linalg.norm(temp, axis=1)
+ALL_POSSIBLE_ACTIONS = temp[norms <= 20]
