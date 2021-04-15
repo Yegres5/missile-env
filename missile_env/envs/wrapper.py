@@ -86,6 +86,10 @@ class Wrapper:
         self.distance_to_target = self.rocket.distanceToTarget
 
         reward = self.d_t
+        reward = 0
+        if self.rocket.destroyed:
+            reward = 1
+        
         return reward
 
     @property
