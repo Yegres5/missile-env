@@ -29,11 +29,12 @@ class Rocket:
     @property
     def state(self):
         """ coord, euler, speed, overload """
-        return [np.copy(self._coord),
+        return np.hstack([np.copy(self._coord),
                 np.copy(self._euler),
                 self._speed,
                 np.copy(self._overload),
-                np.copy(self._current_overloads)]
+                np.copy(self._current_overloads),
+                np.copy(self.dataForNzPN())])
 
     def step(self, action):
         """ action: np.array 1x2 [Nz, Ny] """
@@ -118,6 +119,23 @@ class Rocket:
 
         return n_roll
 
+    def dataForNzPN(self):
+        euler = np.copy(self._euler)
+        euler[2] = 0
+        TargetCoor = toSpeedCoordinateSystem(euler, self.targetInfo[0] - self._coord)
+        TargetSpeed = self.TargetSpeed()
+
+        TargetSpeedXZ = np.array([sqrt(pow(TargetSpeed[0], 2) + pow(TargetSpeed[2], 2)),
+                                  atan2(-TargetSpeed[2], TargetSpeed[0])])
+
+        sigma_R = -atan2(-TargetCoor[2], TargetCoor[0])
+        sigma_T = TargetSpeedXZ[1] - atan2(-TargetCoor[2], TargetCoor[0])
+        r = sqrt(pow(TargetCoor[0], 2) + pow(TargetCoor[2], 2))
+        d_lambda = (TargetSpeedXZ[0] * sin(sigma_T) - self._speed * sin(sigma_R)) / r
+        # W = -k_z * self._speed * d_lambda
+        return np.hstack([TargetCoor, TargetSpeed, TargetSpeedXZ, 
+                          sigma_R, sigma_T, r, d_lambda, -(self._speed * d_lambda)/G])
+
     def proportionalCoefficients(self, k_z=5, k_y=5):
         """ WARNING: call only after grav_compensate shit code """
         return np.array([self.CalculateNzPN(k_z), self.CalculateNyPN(k_y)])
@@ -159,10 +177,12 @@ class Rocket:
     def targetLost(self):
 
         target_coor = self.targetInfo[0]
-
-        angle = np.arccos(abs(np.dot(target_coor, self._coord) /
-                              (np.linalg.norm(target_coor) * np.linalg.norm(self._coord))))
-
+        v1 = target_coor - self._coord
+        v2 = toTrajectoryCoordinateSystem(self._euler, [1, 0, 0])
+        
+        angle = np.arccos(abs(np.dot(v1, v2) /
+                              (np.linalg.norm(v1) * np.linalg.norm(v2))))
+        
         if angle > self._limit_angle:
             return True
         return False
@@ -198,18 +218,19 @@ class LA:
         self._coord[2] += -self._speed * cos(self._euler[0]) * sin(self._euler[1]) * dt
 
     def step(self):
-        manouver_map = self.manouver(0)
+        manouver_map = self.manouver(-1)
         self.grav_compensate()
 
         overload = 0
+        
+        if isinstance(manouver_map, list):
+            for index, obj in enumerate(manouver_map):
+                if self.t < manouver_map[0,0]:
+                    break
 
-        for index, obj in enumerate(manouver_map):
-            if self.t < manouver_map[0,0]:
-                break
-
-            if manouver_map[index, 0]< self.t < manouver_map[index + 1,0]:
-                overload = obj[1]
-                break
+                if manouver_map[index, 0]< self.t < manouver_map[index + 1,0]:
+                    overload = obj[1]
+                    break
 
         self.sumOverloads(0, overload)
 
@@ -233,7 +254,7 @@ class LA:
     def manouver(self, type=0):
         if type == 0:
             start_sec = 5
-            end_sec = 1000
+            end_sec = 2000
             each_sec = 5
             nz = 3
             time_stamps = 3 + np.arange(np.ceil((end_sec-start_sec)/each_sec)+1)*each_sec
@@ -313,3 +334,7 @@ ACTION_MEANING = {np.where(ran == x)[0][0]: f"Nz = {nz_approx(x):.2f}" for x in 
 temp = np.array(np.meshgrid(ALL_NZ, ALL_NZ)).T.reshape(-1, 2)
 norms = np.linalg.norm(temp, axis=1)
 ALL_POSSIBLE_ACTIONS = temp[norms <= 20]
+
+temp = np.arange(-1,1+0.1,0.1)
+temp = np.array([-3, -2, -1, -0.5, -0.2, -0.1, 0, 0.1, 0.2, 0.5, 1, 2, 3])
+ALL_POSSIBLE_ACTIONS = np.vstack([temp, np.zeros(temp.shape[0])]).T

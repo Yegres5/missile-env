@@ -22,7 +22,8 @@ class Wrapper:
         return ALL_POSSIBLE_ACTIONS
 
     def getLegalOverloads(self):
-        ny = self.rocket.state[3][1] # Module of Ny
+        # FIXME: current overloads change 
+        ny = self.rocket._current_overloads[0] # Module of Ny
         diff = np.sqrt(np.sum(ALL_POSSIBLE_ACTIONS ** 2, axis=1)) - ny
         legal_n = ALL_POSSIBLE_ACTIONS[np.ix_((diff <= self.ny_gap)), :].reshape(-1, 2)
 
@@ -38,11 +39,14 @@ class Wrapper:
     def findClosestFromLegal(self, overload):
         # FIXME:wrong algorithm [-12, 0] -> [-5, 3]
         overload_list = self.getLegalOverloads()
+        overload = np.round(overload, 4)
 
         n2_legal = np.sqrt(np.sum(overload_list ** 2, axis=1))
         n2_overload = np.sqrt(np.sum(overload ** 2))
 
         angles_legal = np.arctan2(overload_list[:,1], overload_list[:,0])
+
+
 
         angle_overload = np.arctan2(overload[1], overload[0])
 
@@ -62,7 +66,7 @@ class Wrapper:
         value = sorted[int(np.ceil(r))]
 
         # min_indexes = np.where(np.equal(diff, min_angle))[0]
-        min_indexes = np.where(np.less(diff, value))[0]
+        min_indexes = np.where(np.less_equal(diff, value))[0]
 
         final_index = min_indexes[np.argmin(abs(n2_legal[min_indexes] - n2_overload))]
 
@@ -75,12 +79,14 @@ class Wrapper:
 
     @property
     def state(self):
-        return np.hstack((np.array(self.rocket.state, dtype=object), np.array(self.target.state, dtype=object)))
+        return self.rocket.state#np.hstack((np.array(self.rocket.state, dtype=object), np.array(self.target.state, dtype=object)))
 
     def act(self, action):
         """ action: np.array 1x2 [Nz, Ny] """
         self.target.step()
-        self.rocket.step(action)
+        self.rocket.grav_compensate()
+        # print("Overload that should be is = ", self.rocket.proportionalCoefficients(k_z=2, k_y=2))
+        self.rocket.step(action)  # FIXME: quick fix
 
         reward = self.distance_to_target - self.rocket.distanceToTarget
         self.distance_to_target = self.rocket.distanceToTarget
@@ -88,8 +94,12 @@ class Wrapper:
         reward = self.d_t
         reward = 0
         if self.rocket.destroyed:
-            reward = 1
-        
+            reward = 5
+
+        if self.rocket.targetLost():
+            reward = -1
+
+
         return reward
 
     @property
@@ -114,6 +124,7 @@ class Wrapper:
         t_coor, t_speed, t_euler = self.ini_target_info
         
         if "la_coord" in info:
+            info["la_coord"][1] = 0
             t_coor = t_coor + info["la_coord"]
 
         self.rocket = Rocket(coord=r_coor, euler=r_euler, speed=r_speed, d_t=self.d_t)

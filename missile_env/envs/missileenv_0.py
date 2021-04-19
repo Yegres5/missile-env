@@ -25,7 +25,7 @@ class MissileEnv0(gym.Env):
 
         self.wrap = Wrapper(rocket_info=rocket_info, target_info=target_info)
 
-        self.frameskip = int(np.floor(1/self.wrap.d_t)) # FIXME: action each second
+        # self.frameskip = int(np.floor(1/self.wrap.d_t)) # FIXME: action each second
 
         self.seed()
         self._action_set = self.wrap.getFullActionSet()
@@ -61,6 +61,7 @@ class MissileEnv0(gym.Env):
             reward += self.wrap.act(action)
             if self.wrap.game_over:
                 gameover = True
+                reward +=  3*np.e ** (-1/2000 * self.wrap.distance_to_target)
                 break
 
         ob = self.get_obs
@@ -68,7 +69,8 @@ class MissileEnv0(gym.Env):
         if self.wrap.rocket.destroyed:
             target_hitted = True
 
-        return ob, reward, self.wrap.game_over, {"Destroyed": target_hitted}
+        return ob, reward, self.wrap.game_over, {"Destroyed": target_hitted, 
+                                                 "Distance": self.wrap.distance_to_target}
 
     @property
     def get_obs(self):
