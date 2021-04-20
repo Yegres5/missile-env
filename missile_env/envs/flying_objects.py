@@ -11,7 +11,7 @@ class Rocket:
         self._target = None
         self._n_y_max = 20
         self._d_t = d_t
-        self._limit_angle = np.deg2rad(60)
+        self._limit_angle = np.deg2rad(90)
         self._current_overloads = np.zeros(2)
         self._previous_distance_to_target = sys.float_info.max
         self._explotion_distance = 100
@@ -70,9 +70,9 @@ class Rocket:
 
     def TargetSpeed(self):
 
-        target_speed = np.array([self.targetInfo[2] * cos(self.targetInfo[1][0]) * cos(self.targetInfo[1][1]),
-                                 self.targetInfo[2] * sin(self.targetInfo[1][0]),
-                                 -self.targetInfo[2] * cos(self.targetInfo[1][0]) * sin(self.targetInfo[1][1])])
+        target_speed = np.array([self.targetInfo[6] * cos(self.targetInfo[3:6][0]) * cos(self.targetInfo[3:6][1]),
+                                 self.targetInfo[6] * sin(self.targetInfo[3:6][0]),
+                                 -self.targetInfo[6] * cos(self.targetInfo[3:6][0]) * sin(self.targetInfo[3:6][1])])
 
         target_speed = toSpeedCoordinateSystem(self._euler, target_speed)
 
@@ -82,7 +82,7 @@ class Rocket:
 
         euler = np.copy(self._euler)
         euler[2] = 0
-        target_coor = toSpeedCoordinateSystem(euler, self.targetInfo[0] - self._coord)
+        target_coor = toSpeedCoordinateSystem(euler, self.targetInfo[0:3] - self._coord)
         target_speed = self.TargetSpeed()
 
         target_speed_xy = np.array([sqrt(pow(target_speed[0], 2) + pow(target_speed[1], 2)),
@@ -104,7 +104,7 @@ class Rocket:
 
         euler = np.copy(self._euler)
         euler[2] = 0
-        TargetCoor = toSpeedCoordinateSystem(euler, self.targetInfo[0] - self._coord)
+        TargetCoor = toSpeedCoordinateSystem(euler, self.targetInfo[0:3] - self._coord)
         TargetSpeed = self.TargetSpeed()
 
         TargetSpeedXZ = np.array([sqrt(pow(TargetSpeed[0], 2) + pow(TargetSpeed[2], 2)),
@@ -122,7 +122,7 @@ class Rocket:
     def dataForNzPN(self):
         euler = np.copy(self._euler)
         euler[2] = 0
-        TargetCoor = toSpeedCoordinateSystem(euler, self.targetInfo[0] - self._coord)
+        TargetCoor = toSpeedCoordinateSystem(euler, self.targetInfo[0:3] - self._coord)
         TargetSpeed = self.TargetSpeed()
 
         TargetSpeedXZ = np.array([sqrt(pow(TargetSpeed[0], 2) + pow(TargetSpeed[2], 2)),
@@ -176,9 +176,9 @@ class Rocket:
 
     def targetLost(self):
 
-        target_coor = self.targetInfo[0]
+        target_coor = self.targetInfo[0:3]
         v1 = target_coor - self._coord
-        v2 = toTrajectoryCoordinateSystem(self._euler, [1, 0, 0])
+        v2 = self._euler #toTrajectoryCoordinateSystem(self._euler, [1, 0, 0])
         
         angle = np.arccos(abs(np.dot(v1, v2) /
                               (np.linalg.norm(v1) * np.linalg.norm(v2))))
@@ -189,7 +189,7 @@ class Rocket:
 
     @property
     def distanceToTarget(self):
-        return np.linalg.norm(self.targetInfo[0] - self._coord)
+        return np.linalg.norm(self.targetInfo[0:3] - self._coord)
 
 
 class LA:
@@ -204,10 +204,10 @@ class LA:
     @property
     def state(self):
         """ coord, euler, speed, overload """
-        return [np.copy(self._coord),
+        return np.hstack([np.copy(self._coord),
                 np.copy(self._euler),
                 self._speed,
-                np.copy(self._overload)]
+                np.copy(self._overload)])
 
     def integrate(self, dt):
         self._speed += (self._overload[0] - sin(self._overload[0])) * G * dt
@@ -336,5 +336,5 @@ norms = np.linalg.norm(temp, axis=1)
 ALL_POSSIBLE_ACTIONS = temp[norms <= 20]
 
 temp = np.arange(-1,1+0.1,0.1)
-temp = np.array([-3, -2, -1, -0.5, -0.2, -0.1, 0, 0.1, 0.2, 0.5, 1, 2, 3])
+temp = np.array([-5, -4, -3, -2, -1, -0.5, -0.2, -0.1, 0, 0.1, 0.2, 0.5, 1, 2, 3])
 ALL_POSSIBLE_ACTIONS = np.vstack([temp, np.zeros(temp.shape[0])]).T

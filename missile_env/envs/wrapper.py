@@ -8,7 +8,7 @@ class Wrapper:
     rocket = None
     target = None
     d_t = 0.1
-    ny_gap = 5
+    ny_gap = 20
 
     def __init__(self, rocket_info, target_info):
         self.ini_rocket_info = rocket_info
@@ -46,8 +46,6 @@ class Wrapper:
 
         angles_legal = np.arctan2(overload_list[:,1], overload_list[:,0])
 
-
-
         angle_overload = np.arctan2(overload[1], overload[0])
 
         if angle_overload < 0:
@@ -68,9 +66,18 @@ class Wrapper:
         # min_indexes = np.where(np.equal(diff, min_angle))[0]
         min_indexes = np.where(np.less_equal(diff, value))[0]
 
-        final_index = min_indexes[np.argmin(abs(n2_legal[min_indexes] - n2_overload))]
+        values_min = min_indexes[n2_legal[min_indexes]-n2_overload > 0]
+        
+        if not values_min.size:
+            values_min = np.argmax(n2_legal[min_indexes]-n2_overload)
+        else:
+            values_min = np.argmin(n2_legal[values_min])
 
-        return overload_list[final_index]
+        # final_index = values_min[np.argmin(n2_legal[values_min])]
+        
+        # final_index = min_indexes[values_min]#min_indexes[np.argmin(abs(n2_legal[min_indexes] - n2_overload))]
+
+        return overload_list[min_indexes[values_min]]
 
 
     def setInt(self, param, seed2):
@@ -79,7 +86,7 @@ class Wrapper:
 
     @property
     def state(self):
-        return self.rocket.state#np.hstack((np.array(self.rocket.state, dtype=object), np.array(self.target.state, dtype=object)))
+        return np.hstack((np.array(self.rocket.state, dtype=object), np.array(self.target.state, dtype=object)))
 
     def act(self, action):
         """ action: np.array 1x2 [Nz, Ny] """
@@ -126,6 +133,9 @@ class Wrapper:
         if "la_coord" in info:
             info["la_coord"][1] = 0
             t_coor = t_coor + info["la_coord"]
+
+        if "r_euler" in info:
+            r_euler += info["r_euler"]
 
         self.rocket = Rocket(coord=r_coor, euler=r_euler, speed=r_speed, d_t=self.d_t)
         self.target = LA(coord=t_coor, euler=t_euler, speed=t_speed, d_t=self.d_t)
