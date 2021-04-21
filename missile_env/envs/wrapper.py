@@ -108,7 +108,7 @@ class Wrapper:
 
         reward += -0.1
         if self.rocket.destroyed:
-            reward += 10
+            reward += 40
         elif self.rocket.targetLost():
             reward = -40
 

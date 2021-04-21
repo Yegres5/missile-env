@@ -61,7 +61,8 @@ class MissileEnv0(gym.Env):
             reward += self.wrap.act(action)
             if self.wrap.game_over:
                 gameover = True
-                reward += -self.wrap.rocket.distanceToTarget*1/(18000/50)+50 #100*np.exp(-1/4000*self.wrap.rocket.distanceToTarget)
+                reward += 50*np.exp(-1/2000*self.wrap.rocket.distanceToTarget)
+                # reward += -self.wrap.rocket.distanceToTarget*1/(18000/50)+50 #100*np.exp(-1/4000*self.wrap.rocket.distanceToTarget)
                 break
 
         ob = self.get_obs
