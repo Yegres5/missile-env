@@ -2,7 +2,7 @@ import numpy as np
 from missile_env.envs.flying_objects import Rocket, LA, ALL_NZ, ALL_POSSIBLE_ACTIONS
 import sys
 import matplotlib.pyplot as plt
-
+import copy
 
 class Wrapper:
     rocket = None
@@ -17,6 +17,8 @@ class Wrapper:
         self.reset()
 
         self.distance_to_target = self.rocket.distanceToTarget
+
+        self.reward_program = np.array([[15000, 100], [10000, 100], [5000, 100], [2000, 100], [500, 100]])
 
     def getFullActionSet(self):
         return ALL_POSSIBLE_ACTIONS
@@ -95,16 +97,20 @@ class Wrapper:
         # print("Overload that should be is = ", self.rocket.proportionalCoefficients(k_z=2, k_y=2))
         self.rocket.step(action)  # FIXME: quick fix
 
-        reward = self.distance_to_target - self.rocket.distanceToTarget
         self.distance_to_target = self.rocket.distanceToTarget
 
-        reward = self.d_t
         reward = 0
-        if self.rocket.destroyed:
-            reward = 5
+        # if self.reward_program.size:
+        #     if self.reward_program[0,0] > self.distance_to_target:
+        #         reward += self.reward_program[0, 1]
+        #         self.reward_program = np.delete(self.reward_program, 0, axis=0)
 
-        if self.rocket.targetLost():
-            reward = -1
+
+        reward += -0.1
+        if self.rocket.destroyed:
+            reward += 10
+        elif self.rocket.targetLost():
+            reward = -40
 
 
         return reward
@@ -127,8 +133,10 @@ class Wrapper:
 
     def reset(self, **info):
         """  """
-        r_coor, r_speed, r_euler = self.ini_rocket_info
-        t_coor, t_speed, t_euler = self.ini_target_info
+        self.reward_program = np.array([[15000, 100], [10000, 100], [5000, 100], [2000, 100], [500, 100]])
+        
+        r_coor, r_speed, r_euler = copy.deepcopy(self.ini_rocket_info)
+        t_coor, t_speed, t_euler = copy.deepcopy(self.ini_target_info)
         
         if "la_coord" in info:
             info["la_coord"][1] = 0
@@ -136,6 +144,10 @@ class Wrapper:
 
         if "r_euler" in info:
             r_euler += info["r_euler"]
+
+        if "t_euler" in info:
+            t_euler += info["t_euler"]
+
 
         self.rocket = Rocket(coord=r_coor, euler=r_euler, speed=r_speed, d_t=self.d_t)
         self.target = LA(coord=t_coor, euler=t_euler, speed=t_speed, d_t=self.d_t)

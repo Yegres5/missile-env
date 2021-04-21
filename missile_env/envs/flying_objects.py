@@ -11,10 +11,12 @@ class Rocket:
         self._target = None
         self._n_y_max = 20
         self._d_t = d_t
-        self._limit_angle = np.deg2rad(90)
+        self._limit_angle = np.deg2rad(60)
         self._current_overloads = np.zeros(2)
         self._previous_distance_to_target = sys.float_info.max
         self._explotion_distance = 100
+        self._t = 0
+        self._max_time = 60
 
     def captureTarget(self, target):
         self._target = target
@@ -34,7 +36,8 @@ class Rocket:
                 self._speed,
                 np.copy(self._overload),
                 np.copy(self._current_overloads),
-                np.copy(self.dataForNzPN())])
+                np.copy(self.dataForNzPN()),
+                self.angleToTarget])
 
     def step(self, action):
         """ action: np.array 1x2 [Nz, Ny] """
@@ -68,13 +71,14 @@ class Rocket:
         self._overload[1] = sqrt(pow(self._overload[1], 2) + pow(n_roll, 2)) * (1 if self._overload[1] > 0 else -1)
         self._overload[2] = 0
 
-    def TargetSpeed(self):
+    def TargetSpeed(self, angles):
 
         target_speed = np.array([self.targetInfo[6] * cos(self.targetInfo[3:6][0]) * cos(self.targetInfo[3:6][1]),
                                  self.targetInfo[6] * sin(self.targetInfo[3:6][0]),
                                  -self.targetInfo[6] * cos(self.targetInfo[3:6][0]) * sin(self.targetInfo[3:6][1])])
 
-        target_speed = toSpeedCoordinateSystem(self._euler, target_speed)
+        
+        target_speed = toSpeedCoordinateSystem(angles, target_speed)
 
         return target_speed
 
@@ -83,7 +87,7 @@ class Rocket:
         euler = np.copy(self._euler)
         euler[2] = 0
         target_coor = toSpeedCoordinateSystem(euler, self.targetInfo[0:3] - self._coord)
-        target_speed = self.TargetSpeed()
+        target_speed = self.TargetSpeed(self._euler)
 
         target_speed_xy = np.array([sqrt(pow(target_speed[0], 2) + pow(target_speed[1], 2)),
                                     atan2(target_speed[1], target_speed[0])])
@@ -105,7 +109,7 @@ class Rocket:
         euler = np.copy(self._euler)
         euler[2] = 0
         TargetCoor = toSpeedCoordinateSystem(euler, self.targetInfo[0:3] - self._coord)
-        TargetSpeed = self.TargetSpeed()
+        TargetSpeed = self.TargetSpeed(euler)
 
         TargetSpeedXZ = np.array([sqrt(pow(TargetSpeed[0], 2) + pow(TargetSpeed[2], 2)),
                                   atan2(-TargetSpeed[2], TargetSpeed[0])])
@@ -123,7 +127,7 @@ class Rocket:
         euler = np.copy(self._euler)
         euler[2] = 0
         TargetCoor = toSpeedCoordinateSystem(euler, self.targetInfo[0:3] - self._coord)
-        TargetSpeed = self.TargetSpeed()
+        TargetSpeed = self.TargetSpeed(euler)
 
         TargetSpeedXZ = np.array([sqrt(pow(TargetSpeed[0], 2) + pow(TargetSpeed[2], 2)),
                                   atan2(-TargetSpeed[2], TargetSpeed[0])])
@@ -153,6 +157,7 @@ class Rocket:
         self.LimitOverload()
 
         self.integrate(self._d_t)
+        self._t += self._d_t 
 
     def integrate(self, dt):
         self._speed += (self._overload[0] - sin(self._overload[0])) * G * dt
@@ -173,18 +178,25 @@ class Rocket:
             #     return True
 
         return False
-
-    def targetLost(self):
-
+    
+    @property
+    def angleToTarget(self):
         target_coor = self.targetInfo[0:3]
         v1 = target_coor - self._coord
-        v2 = self._euler #toTrajectoryCoordinateSystem(self._euler, [1, 0, 0])
-        
+        v2 = toTrajectoryCoordinateSystem(self._euler, [1, 0, 0])
+
         angle = np.arccos(abs(np.dot(v1, v2) /
-                              (np.linalg.norm(v1) * np.linalg.norm(v2))))
+                          (np.linalg.norm(v1) * np.linalg.norm(v2))))
         
-        if angle > self._limit_angle:
+        return angle
+    
+    def targetLost(self):
+        if self._t > self._max_time:
             return True
+        
+        if self.angleToTarget > self._limit_angle:
+            return True
+        
         return False
 
     @property
@@ -336,5 +348,6 @@ norms = np.linalg.norm(temp, axis=1)
 ALL_POSSIBLE_ACTIONS = temp[norms <= 20]
 
 temp = np.arange(-1,1+0.1,0.1)
-temp = np.array([-5, -4, -3, -2, -1, -0.5, -0.2, -0.1, 0, 0.1, 0.2, 0.5, 1, 2, 3])
+temp = np.array([-10, -5, -4, -3, -2, -1, -0.5, -0.2, -0.1, 0, 0.1, 0.2, 0.5, 1, 2, 3, 4, 5, 10])
+
 ALL_POSSIBLE_ACTIONS = np.vstack([temp, np.zeros(temp.shape[0])]).T
