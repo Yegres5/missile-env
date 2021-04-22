@@ -18,6 +18,8 @@ class MissileEnv0(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, rocket_info, target_info, obs_type='ram', frameskip=1):
+        print("init")
+
         self._obs_type = obs_type
         self.frameskip = frameskip
 
@@ -25,7 +27,7 @@ class MissileEnv0(gym.Env):
 
         # self.frameskip = int(np.floor(1/self.wrap.d_t)) # FIXME: action each second
 
-        self.seed()
+        self.seed(42)
         self._action_set = self.wrap.getFullActionSet()
         self.action_space = spaces.Discrete(len(self._action_set))
 
@@ -59,8 +61,8 @@ class MissileEnv0(gym.Env):
             reward += self.wrap.act(action)
             if self.wrap.game_over:
                 gameover = True
-                # reward += 30*np.exp(-1/4000*self.wrap.rocket.distanceToTarget)
-                reward += -self.wrap.rocket.distanceToTarget*1/(18000/10)+10 #100*np.exp(-1/4000*self.wrap.rocket.distanceToTarget)
+                reward += 30*np.exp(-1/8000*self.wrap.rocket.distanceToTarget)
+                # reward += -self.wrap.rocket.distanceToTarget*1/(18000/20)+20 #100*np.exp(-1/4000*self.wrap.rocket.distanceToTarget)
                 break
 
         ob = self.get_obs
