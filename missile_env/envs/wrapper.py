@@ -140,6 +140,9 @@ class Wrapper:
         r_coor, r_speed, r_euler = copy.deepcopy(self.ini_rocket_info)
         t_coor, t_speed, t_euler = copy.deepcopy(self.ini_target_info)
         
+        info = {"r_euler": [0, np.random.uniform(np.deg2rad(-5), np.deg2rad(5)), 0],
+            "t_euler": [0, np.random.uniform(np.deg2rad(-90), np.deg2rad(90)), 0]}
+
         if "la_coord" in info:
             info["la_coord"][1] = 0
             t_coor = t_coor + info["la_coord"]
