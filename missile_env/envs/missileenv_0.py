@@ -18,8 +18,6 @@ class MissileEnv0(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, rocket_info, target_info, obs_type='ram', frameskip=1):
-        print("init")
-
         self._obs_type = obs_type
         self.frameskip = frameskip
 
