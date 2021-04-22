@@ -107,10 +107,10 @@ class Wrapper:
         #         self.reward_program = np.delete(self.reward_program, 0, axis=0)
 
 
-        # reward += -0.1
-        reward = 0
+        reward += -0.1
+        # reward = 0
         if self.rocket.destroyed:
-            reward += -6
+            reward += -5
         elif self.rocket.targetLost():
             reward += -10
 
