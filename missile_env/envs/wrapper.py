@@ -71,15 +71,16 @@ class Wrapper:
         values_min = min_indexes[n2_legal[min_indexes]-n2_overload > 0]
         
         if not values_min.size:
-            values_min = np.argmax(n2_legal[min_indexes]-n2_overload)
+            values_min = min_indexes[np.argmax(n2_legal[min_indexes]-n2_overload)]
         else:
-            values_min = np.argmin(n2_legal[values_min])
+            # values_min = np.argmin(n2_legal[values_min])
+            values_min = values_min[np.argmin(n2_legal[values_min])]
 
         # final_index = values_min[np.argmin(n2_legal[values_min])]
         
         # final_index = min_indexes[values_min]#min_indexes[np.argmin(abs(n2_legal[min_indexes] - n2_overload))]
 
-        return overload_list[min_indexes[values_min]]
+        return overload_list[values_min]
 
 
     def setInt(self, param, seed2):
@@ -106,11 +107,12 @@ class Wrapper:
         #         self.reward_program = np.delete(self.reward_program, 0, axis=0)
 
 
-        reward += -0.1
+        # reward += -0.1
+        reward = 0
         if self.rocket.destroyed:
-            reward += 40
+            reward += -6
         elif self.rocket.targetLost():
-            reward = -40
+            reward += -10
 
 
         return reward
