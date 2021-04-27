@@ -107,19 +107,45 @@ class Wrapper:
         #         self.reward_program = np.delete(self.reward_program, 0, axis=0)
 
 
-        reward += -0.05
+        # reward += -0.05
+        
+        # if self.rocket.destroyed:
+        #     reward += 5
+        # elif self.rocket.targetLost():
+        #     reward += -10
+
+        if self.rocket.targetLost:
+            reward -= 0.03
+        else:
+            reward -= 0.01
         
         if self.rocket.destroyed:
-            reward += 5
-        elif self.rocket.targetLost():
-            reward += -10
+            reward += 0#100
 
 
+        # reward -= 0.01*np.exp(1/10000*(self.rocket.distanceToTarget - 10000))
+
+        # reward +=  0.01*np.exp(-1/5000*self.rocket.distanceToTarget)
+
+        if self.game_over:
+            reward += 10*np.exp(-1/5000*self.rocket.distanceToTarget)
+            # reward += -self.rocket.distanceToTarget/(18000/10)+10
+
+        # if self.rocket.distanceToTarget > 18000:
+        #     reward -= 0.5
+        # elif self.rocket.distanceToTarget > 10000:
+        #     reward -= 0.4
+        # elif self.rocket.distanceToTarget > 5000:
+        #     reward -= 0.3
+        # elif self.rocket.distanceToTarget > 2000:
+        #     reward -= 0.2
+        
+        
         return reward
 
     @property
     def game_over(self):
-        if self.rocket.destroyed or self.rocket.targetLost():
+        if self.rocket.destroyed or self.rocket.timeExceeded or self.rocket.targetBehind:
             return True
         return False
 
@@ -142,8 +168,8 @@ class Wrapper:
         
         # Not working git
         #Checking
-        info = {"r_euler": [0, np.random.uniform(np.deg2rad(-5), np.deg2rad(5)), 0],
-                "t_euler": [0, np.random.uniform(np.deg2rad(-90), np.deg2rad(90)), 0]}
+        # info = {"r_euler": [0, np.random.uniform(np.deg2rad(-5), np.deg2rad(5)), 0],
+        #         "t_euler": [0, np.random.uniform(np.deg2rad(-90), np.deg2rad(90)), 0]}
 
         if "la_coord" in info:
             info["la_coord"][1] = 0

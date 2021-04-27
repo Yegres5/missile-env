@@ -16,7 +16,7 @@ class Rocket:
         self._previous_distance_to_target = sys.float_info.max
         self._explotion_distance = 100
         self._t = 0
-        self._max_time = 60
+        self._max_time = 30
 
     def captureTarget(self, target):
         self._target = target
@@ -183,25 +183,37 @@ class Rocket:
     def angleToTarget(self):
         target_coor = self.targetInfo[0:3]
         v1 = target_coor - self._coord
-        v2 = toTrajectoryCoordinateSystem(self._euler, [1, 0, 0])
+        euler = self._euler
+        # euler[1] = -euler[1]
+        # v1[0], v1[1] = v1[1], v1[0]
+        v2 = toTrajectoryCoordinateSystem(euler, [1, 0, 0])
 
-        angle = np.arccos(abs(np.dot(v1, v2) /
-                          (np.linalg.norm(v1) * np.linalg.norm(v2))))
+        angle = np.arccos(np.dot(v1, v2) /
+                          (np.linalg.norm(v1) * np.linalg.norm(v2)))
         
         return angle
-    
+
+    @property
     def targetLost(self):
-        if self._t > self._max_time:
+        if abs(self.angleToTarget) > self._limit_angle:
             return True
-        
-        if self.angleToTarget > self._limit_angle:
+        return False
+
+    @property
+    def targetBehind(self):
+        if abs(self.angleToTarget) > np.deg2rad(120):
             return True
-        
         return False
 
     @property
     def distanceToTarget(self):
         return np.linalg.norm(self.targetInfo[0:3] - self._coord)
+
+    @property
+    def timeExceeded(self):
+        if self._t > self._max_time:
+            return True
+        return False
 
 
 class LA:
