@@ -201,7 +201,7 @@ class Rocket:
 
     @property
     def targetBehind(self):
-        if abs(self.angleToTarget) > np.deg2rad(120):
+        if abs(self.angleToTarget) > self._limit_angle:#np.deg2rad(120):
             return True
         return False
 
