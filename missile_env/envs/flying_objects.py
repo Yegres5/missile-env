@@ -133,10 +133,14 @@ class Rocket:
                                   atan2(-TargetSpeed[2], TargetSpeed[0])])
 
         sigma_R = -atan2(-TargetCoor[2], TargetCoor[0])
+
         sigma_T = TargetSpeedXZ[1] - atan2(-TargetCoor[2], TargetCoor[0])
+
         r = sqrt(pow(TargetCoor[0], 2) + pow(TargetCoor[2], 2))
+
         d_lambda = (TargetSpeedXZ[0] * sin(sigma_T) - self._speed * sin(sigma_R)) / r
         # W = -k_z * self._speed * d_lambda
+        # 0 2 3 4 5
         return np.hstack([TargetCoor, TargetSpeed, TargetSpeedXZ, 
                           sigma_R, sigma_T, r, d_lambda, -(self._speed * d_lambda)/G])
 
@@ -201,7 +205,7 @@ class Rocket:
 
     @property
     def targetBehind(self):
-        if abs(self.angleToTarget) > self._limit_angle:#np.deg2rad(120):
+        if abs(self.angleToTarget) > np.deg2rad(120):
             return True
         return False
 
@@ -242,12 +246,12 @@ class LA:
         self._coord[2] += -self._speed * cos(self._euler[0]) * sin(self._euler[1]) * dt
 
     def step(self):
-        manouver_map = self.manouver(-1)
+        manouver_map = self.manouver(0)
         self.grav_compensate()
 
         overload = 0
         
-        if isinstance(manouver_map, list):
+        if isinstance(manouver_map, np.ndarray):
             for index, obj in enumerate(manouver_map):
                 if self.t < manouver_map[0,0]:
                     break
@@ -361,5 +365,5 @@ ALL_POSSIBLE_ACTIONS = temp[norms <= 20]
 
 temp = np.arange(-1,1+0.1,0.1)
 temp = np.array([-10, -5, -4, -3, -2, -1, -0.5, -0.2, -0.1, 0, 0.1, 0.2, 0.5, 1, 2, 3, 4, 5, 10])
-
+# temp = np.hstack([np.arange(-10, -1), np.arange(-1, 1, 0.1), np.arange(1, 10)])
 ALL_POSSIBLE_ACTIONS = np.vstack([temp, np.zeros(temp.shape[0])]).T

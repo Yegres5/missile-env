@@ -127,10 +127,12 @@ class Wrapper:
         if self.game_over:
             reward += 0#10*np.exp(-1/5000*self.rocket.distanceToTarget) + 10*np.exp(-1/300*self.rocket.distanceToTarget)
             if not self.rocket.destroyed:
-                reward -= 0#10
+                # reward -= 4
+                # reward -= -1/1000*self.rocket.distanceToTarget 
+                
                 reward += -20/18000*self.rocket.distanceToTarget
             else:
-                reward += 14
+                reward += 4
             # reward += -self.rocket.distanceToTarget/(18000/10)+10
 
         # if self.rocket.distanceToTarget > 18000:
