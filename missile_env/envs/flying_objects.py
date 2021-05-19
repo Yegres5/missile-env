@@ -16,7 +16,10 @@ class Rocket:
         self._previous_distance_to_target = sys.float_info.max
         self._explotion_distance = 100
         self._t = 0
-        self._max_time = 30
+        self._max_time = 60
+
+        self.m = 157-51.01
+        self.s = 0.4
 
     def captureTarget(self, target):
         self._target = target
@@ -123,6 +126,48 @@ class Rocket:
 
         return n_roll
 
+    def M(self):
+        return self._speed/300
+
+    def q(self):
+        return 0.5*self.p()*self._speed**2
+
+    def p(self):
+        return 0.4671
+
+    def D_0(self, V):
+        table_coeff = np.array([
+            # 250, 300, 320, 500, 900, 1200,
+            # 0.0019, 0.0029, 0.0039, 0.0033, 0.0021, 0.0017
+            250, 300, 325, 350, 500, 900, 1200,
+            0.0037, 0.0057, 0.0075, 0.0075, 0.0062, 0.0041, 0.0031
+
+        ])
+        table_coeff = table_coeff.reshape(2, -1).T
+        D_0_ = table_coeff[0]
+        if V < D_0_[0]:
+            return D_0_[1]
+
+        for D_1_ in table_coeff:
+            if V <= D_1_[0]:
+                return np.arctan((D_1_[1]-D_0_[1])/(D_1_[0]-D_0_[0]))*(V-D_0_[0]) + D_0_[1]
+            else:
+                D_0_ = D_1_
+
+    def D_a(self, overload):
+        C_L = self.m*overload*G/(self.q()*self.s)
+
+        k = 1/np.arctan(0.12/30)
+        angle = C_L*k
+        D_a = 0.022*np.deg2rad(angle)**2-0.000002*(self._speed-400)
+
+        return D_a
+
+    def CalculateDragForce(self, speed, overload):
+        drag = 7*(self.D_0(speed) + self.D_a(overload))
+
+        return drag*self.q()*self.s/(self.m*G)
+
     def dataForNzPN(self):
         euler = np.copy(self._euler)
         euler[2] = 0
@@ -153,12 +198,12 @@ class Rocket:
             self._overload[1]) > (self._n_y_max - 1) else self._overload[1]
 
     def update(self, action):
-
         self.grav_compensate()
 
         self.sumOverloads(action[1], action[0])
 
         self.LimitOverload()
+        self._overload[0] -= self.CalculateDragForce(self._speed, self._overload[1])
 
         self.integrate(self._d_t)
         self._t += self._d_t 
@@ -198,6 +243,10 @@ class Rocket:
         return angle
 
     @property
+    def speed(self):
+        return self._speed
+
+    @property
     def targetLost(self):
         if abs(self.angleToTarget) > self._limit_angle:
             return True
@@ -205,7 +254,7 @@ class Rocket:
 
     @property
     def targetBehind(self):
-        if abs(self.angleToTarget) > np.deg2rad(120):
+        if abs(self.angleToTarget) > self._limit_angle+np.deg2rad(10) or self._speed < 200:
             return True
         return False
 
@@ -246,7 +295,7 @@ class LA:
         self._coord[2] += -self._speed * cos(self._euler[0]) * sin(self._euler[1]) * dt
 
     def step(self):
-        manouver_map = self.manouver(0)
+        manouver_map = self.manouver(1)
         self.grav_compensate()
 
         overload = 0
@@ -288,8 +337,20 @@ class LA:
             time_stamps = 3 + np.arange(np.ceil((end_sec-start_sec)/each_sec)+1)*each_sec
             overloads = np.tile(np.array([nz,-nz]), time_stamps.shape[0])[:time_stamps.shape[0]]
             return np.array([np.array([time_stamps[i], overloads[i]]) for i in range(time_stamps.shape[0])])
+        if type == 1:
+            start_sec = 5
+            end_sec = 2000
+            each_sec = 10
+            nz = 5
+            time_stamps = 0 + np.arange(np.ceil((end_sec-start_sec)/each_sec)+1)*each_sec
+            time_stamps[0] += each_sec/2
+            overloads = np.tile(np.array([nz,-nz]), time_stamps.shape[0])[:time_stamps.shape[0]]
+            overloads = overloads * -1
+            return np.array([np.array([time_stamps[i], overloads[i]]) for i in range(time_stamps.shape[0])])
 
         return 0
+
+
 
 
 G = 9.81
@@ -364,6 +425,6 @@ norms = np.linalg.norm(temp, axis=1)
 ALL_POSSIBLE_ACTIONS = temp[norms <= 20]
 
 temp = np.arange(-1,1+0.1,0.1)
-temp = np.array([-10, -5, -4, -3, -2, -1, -0.5, -0.2, -0.1, 0, 0.1, 0.2, 0.5, 1, 2, 3, 4, 5, 10])
-# temp = np.hstack([np.arange(-10, -1), np.arange(-1, 1, 0.1), np.arange(1, 10)])
+# temp = np.array([-7, -5, -4, -3, -2, -1, -0.5, -0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.5, 1, 2, 3, 4, 5, 7])
+temp = np.hstack([np.arange(-7, -1), np.arange(-1, 1, 0.1), np.arange(1, 8)])
 ALL_POSSIBLE_ACTIONS = np.vstack([temp, np.zeros(temp.shape[0])]).T

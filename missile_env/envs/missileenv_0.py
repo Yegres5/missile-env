@@ -71,7 +71,8 @@ class MissileEnv0(gym.Env):
             target_hitted = True
 
         return ob, reward, self.wrap.game_over, {"Destroyed": target_hitted, 
-                                                 "Distance": self.wrap.distance_to_target}
+                                                 "Distance": self.wrap.distance_to_target,
+                                                 "Final speed": self.wrap.rocketSpeed}
 
     @property
     def get_obs(self):

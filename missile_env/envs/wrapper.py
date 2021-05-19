@@ -19,6 +19,7 @@ class Wrapper:
         self.distance_to_target = self.rocket.distanceToTarget
 
         self.reward_program = np.array([[15000, 100], [10000, 100], [5000, 100], [2000, 100], [500, 100]])
+        self.start_path = 0
 
     def getFullActionSet(self):
         return ALL_POSSIBLE_ACTIONS
@@ -37,6 +38,13 @@ class Wrapper:
     def overloadsToNumber(self, overloads):
         _, indexes = np.where([np.all(ALL_POSSIBLE_ACTIONS == i, axis=1) for i in overloads])
         return indexes
+
+    def numberToOverloads(self, num_action):
+        return ALL_POSSIBLE_ACTIONS[num_action]
+
+    @property
+    def rocketSpeed(self):
+        return self.rocket.speed
 
     def findClosestFromLegal(self, overload):
         # FIXME:wrong algorithm [-12, 0] -> [-5, 3]
@@ -89,7 +97,9 @@ class Wrapper:
 
     @property
     def state(self):
-        return np.hstack((np.array(self.rocket.state, dtype=object), np.array(self.target.state, dtype=object)))
+        return np.hstack((np.array(self.rocket.state, dtype=object),
+                          np.array(self.target.state, dtype=object),
+                          self.start_path))
 
     def act(self, action):
         """ action: np.array 1x2 [Nz, Ny] """
@@ -115,9 +125,9 @@ class Wrapper:
         #     reward += -10
 
         if self.rocket.targetLost:
-            reward -= 0.05
+            reward -= 0#0.05
         else:
-            reward -= 0.01
+            reward -= 0#0.01
 
 
         # reward -= 0.01*np.exp(1/10000*(self.rocket.distanceToTarget - 10000))
@@ -126,13 +136,14 @@ class Wrapper:
 
         if self.game_over:
             reward += 0#10*np.exp(-1/5000*self.rocket.distanceToTarget) + 10*np.exp(-1/300*self.rocket.distanceToTarget)
+
             if not self.rocket.destroyed:
-                # reward -= 4
-                # reward -= -1/1000*self.rocket.distanceToTarget 
-                
+                reward -= 0
+                # reward -= -1/1000*self.rocket.distanceToTarget
                 reward += -20/18000*self.rocket.distanceToTarget
+
             else:
-                reward += 4
+                reward += 1#4
             # reward += -self.rocket.distanceToTarget/(18000/10)+10
 
         # if self.rocket.distanceToTarget > 18000:
@@ -166,6 +177,7 @@ class Wrapper:
     def reset(self, **info):
         """  """
         self.reward_program = np.array([[15000, 100], [10000, 100], [5000, 100], [2000, 100], [500, 100]])
+        # self.start_path = np.sign(info["t_euler"][1])
         
         r_coor, r_speed, r_euler = copy.deepcopy(self.ini_rocket_info)
         t_coor, t_speed, t_euler = copy.deepcopy(self.ini_target_info)
@@ -179,12 +191,14 @@ class Wrapper:
             info["la_coord"][1] = 0
             t_coor = t_coor + info["la_coord"]
 
+
         if "r_euler" in info:
             r_euler += info["r_euler"]
 
         if "t_euler" in info:
             t_euler += info["t_euler"]
 
+        self.start_path = np.sign(t_euler[1])
 
         self.rocket = Rocket(coord=r_coor, euler=r_euler, speed=r_speed, d_t=self.d_t)
         self.target = LA(coord=t_coor, euler=t_euler, speed=t_speed, d_t=self.d_t)
