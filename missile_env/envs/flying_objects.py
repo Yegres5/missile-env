@@ -270,13 +270,17 @@ class Rocket:
 
 
 class LA:
-    def __init__(self, coord, euler, speed, d_t):
+    def __init__(self, coord, euler, speed, d_t, maneuver=0):
+        self.start_maneuver_angle = euler[1]
+        self.maneuver_sign = 1
+        self.triger = True
         self._coord = np.array(coord, dtype=np.float)
         self._speed = speed
         self._euler = np.array(euler, dtype=np.float)
         self._overload = np.array([0, 1, 0], dtype=np.float)
         self._d_t = d_t
         self.t = 0
+        self.maneuver_type = maneuver
 
     @property
     def state(self):
@@ -295,19 +299,19 @@ class LA:
         self._coord[2] += -self._speed * cos(self._euler[0]) * sin(self._euler[1]) * dt
 
     def step(self):
-        manouver_map = self.manouver(1)
         self.grav_compensate()
+        # maneuver_map = self.maneuver()
 
-        overload = 0
+        overload = self.maneuver()
         
-        if isinstance(manouver_map, np.ndarray):
-            for index, obj in enumerate(manouver_map):
-                if self.t < manouver_map[0,0]:
-                    break
-
-                if manouver_map[index, 0]< self.t < manouver_map[index + 1,0]:
-                    overload = obj[1]
-                    break
+        # if isinstance(maneuver_map, np.ndarray):
+        #     for index, obj in enumerate(maneuver_map):
+        #         if self.t < maneuver_map[0,0]:
+        #             break
+        #
+        #         if maneuver_map[index, 0] < self.t < maneuver_map[index + 1,0]:
+        #             overload = obj[1]
+        #             break
 
         self.sumOverloads(0, overload)
 
@@ -328,16 +332,18 @@ class LA:
         self._euler[2] += 0 if np.isclose(n_roll, 0) else atan(n_roll / self._overload[1])
         self._overload[1] = sqrt(pow(self._overload[1], 2) + pow(n_roll, 2)) * (1 if self._overload[1] > 0 else -1)
 
-    def manouver(self, type=0):
-        if type == 0:
+    def maneuver(self):
+        if self.maneuver_type == 0:
             start_sec = 5
             end_sec = 2000
             each_sec = 5
             nz = 3
             time_stamps = 3 + np.arange(np.ceil((end_sec-start_sec)/each_sec)+1)*each_sec
+            time_stamps[0] += each_sec/2
             overloads = np.tile(np.array([nz,-nz]), time_stamps.shape[0])[:time_stamps.shape[0]]
-            return np.array([np.array([time_stamps[i], overloads[i]]) for i in range(time_stamps.shape[0])])
-        if type == 1:
+            maneuver_map = np.array([np.array([time_stamps[i], overloads[i]]) for i in range(time_stamps.shape[0])])
+
+        if self.maneuver_type == 1:
             start_sec = 5
             end_sec = 2000
             each_sec = 10
@@ -345,8 +351,68 @@ class LA:
             time_stamps = 0 + np.arange(np.ceil((end_sec-start_sec)/each_sec)+1)*each_sec
             time_stamps[0] += each_sec/2
             overloads = np.tile(np.array([nz,-nz]), time_stamps.shape[0])[:time_stamps.shape[0]]
-            overloads = overloads * -1
-            return np.array([np.array([time_stamps[i], overloads[i]]) for i in range(time_stamps.shape[0])])
+            overloads = overloads
+            maneuver_map = np.array([np.array([time_stamps[i], overloads[i]]) for i in range(time_stamps.shape[0])])
+
+        if self.maneuver_type == 2:
+            start_sec = 3
+            manouver_angle = 45
+
+            if self.triger:
+                manouver_angle *= 2/3
+
+            if self.maneuver_sign < 0 and self.start_maneuver_angle+np.deg2rad(manouver_angle) < self._euler[1]:
+                self.maneuver_sign = 1
+                self.triger = False
+
+            if self.maneuver_sign > 0 and self.start_maneuver_angle-np.deg2rad(manouver_angle) > self._euler[1]:
+                self.maneuver_sign = -1
+                self.triger = False
+
+            return 3*self.maneuver_sign
+
+        if self.maneuver_type == 3:
+            start_sec = 3
+            manouver_angle = 45
+
+            if self.triger:
+                manouver_angle *= 2/3
+
+            if self.maneuver_sign < 0 and self.start_maneuver_angle+np.deg2rad(manouver_angle) < self._euler[1]:
+                self.maneuver_sign = 1
+                self.triger = False
+
+            if self.maneuver_sign > 0 and self.start_maneuver_angle-np.deg2rad(manouver_angle) > self._euler[1]:
+                self.maneuver_sign = -1
+                self.triger = False
+
+            return 4*self.maneuver_sign
+
+        if self.maneuver_type == 4:
+            start_sec = 3
+            manouver_angle = 45
+
+            if self.triger:
+                manouver_angle *= 2/3
+
+            if self.maneuver_sign < 0 and self.start_maneuver_angle+np.deg2rad(manouver_angle) < self._euler[1]:
+                self.maneuver_sign = 1
+                self.triger = False
+
+            if self.maneuver_sign > 0 and self.start_maneuver_angle-np.deg2rad(manouver_angle) > self._euler[1]:
+                self.maneuver_sign = -1
+                self.triger = False
+
+            return 5*self.maneuver_sign
+
+
+        if self.maneuver_type == 0 or self.maneuver_type == 1:
+            for index, obj in enumerate(maneuver_map):
+                if self.t < maneuver_map[0,0]:
+                    return 0
+
+                if maneuver_map[index, 0] < self.t < maneuver_map[index + 1,0]:
+                    return obj[1]
 
         return 0
 

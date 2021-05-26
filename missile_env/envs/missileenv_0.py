@@ -13,12 +13,12 @@ def to_ram(wrap):
     # wrap.getRAM(ram)
     return wrap.getRAM()
 
-
 class MissileEnv0(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, rocket_info, target_info, obs_type='ram', frameskip=1):
-        print("init")
+    def __init__(self,
+                 rocket_info=[np.array([0, 0, 0]), 900, np.deg2rad([0, 0, 0])],
+                 target_info=[np.array([25000, 0, 0]), 200, np.deg2rad([0, 0, 0])], obs_type='ram', frameskip=1):
 
         self._obs_type = obs_type
         self.frameskip = frameskip

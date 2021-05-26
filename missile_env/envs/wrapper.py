@@ -181,6 +181,7 @@ class Wrapper:
         
         r_coor, r_speed, r_euler = copy.deepcopy(self.ini_rocket_info)
         t_coor, t_speed, t_euler = copy.deepcopy(self.ini_target_info)
+        maneuver = 0
         
         # Not working git
         #Checking
@@ -188,9 +189,7 @@ class Wrapper:
         #         "t_euler": [0, np.random.uniform(np.deg2rad(-90), np.deg2rad(90)), 0]}
 
         if "la_coord" in info:
-            info["la_coord"][1] = 0
-            t_coor = t_coor + info["la_coord"]
-
+            t_coor = info["la_coord"]
 
         if "r_euler" in info:
             r_euler += info["r_euler"]
@@ -198,9 +197,12 @@ class Wrapper:
         if "t_euler" in info:
             t_euler += info["t_euler"]
 
+        if "maneuver" in info:
+            maneuver = info["maneuver"]
+
         self.start_path = np.sign(t_euler[1])
 
         self.rocket = Rocket(coord=r_coor, euler=r_euler, speed=r_speed, d_t=self.d_t)
-        self.target = LA(coord=t_coor, euler=t_euler, speed=t_speed, d_t=self.d_t)
+        self.target = LA(coord=t_coor, euler=t_euler, speed=t_speed, d_t=self.d_t, maneuver=maneuver)
         self.rocket.captureTarget(self.target)
         return self.state
