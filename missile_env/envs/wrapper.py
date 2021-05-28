@@ -1,5 +1,5 @@
 import numpy as np
-from missile_env.envs.flying_objects import Rocket, LA, ALL_NZ, ALL_POSSIBLE_ACTIONS
+from missile_env.envs.flying_objects import Rocket, LA, ALL_POSSIBLE_ACTIONS
 import sys
 import matplotlib.pyplot as plt
 import copy
@@ -97,9 +97,7 @@ class Wrapper:
 
     @property
     def state(self):
-        return np.hstack((np.array(self.rocket.state, dtype=object),
-                          np.array(self.target.state, dtype=object),
-                          self.start_path))
+        return self.rocket.state + self.target.state + [self.start_path]
 
     def act(self, action):
         """ action: np.array 1x2 [Nz, Ny] """
@@ -192,10 +190,10 @@ class Wrapper:
             t_coor = info["la_coord"]
 
         if "r_euler" in info:
-            r_euler += info["r_euler"]
+            r_euler = [r_euler[i] + value for i,value in enumerate(info["r_euler"]) ]
 
         if "t_euler" in info:
-            t_euler += info["t_euler"]
+            t_euler = [t_euler[i] + value for i,value in enumerate(info["t_euler"]) ]
 
         if "maneuver" in info:
             maneuver = info["maneuver"]

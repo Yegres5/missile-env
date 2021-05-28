@@ -6,6 +6,7 @@ from gym.utils import seeding
 from math import atan
 import matplotlib.pyplot as plt
 import sys
+import yappi
 
 def to_ram(wrap):
     # ram_size = wrap.getRAMSize()
@@ -17,8 +18,8 @@ class MissileEnv0(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self,
-                 rocket_info=[np.array([0, 0, 0]), 900, np.deg2rad([0, 0, 0])],
-                 target_info=[np.array([25000, 0, 0]), 200, np.deg2rad([0, 0, 0])], obs_type='ram', frameskip=1):
+                 rocket_info=[[0, 0, 0], 900, [0, 0, 0]],
+                 target_info=[[25000, 0, 0], 200, [0, 0, 0]], obs_type='ram', frameskip=1):
 
         self._obs_type = obs_type
         self.frameskip = frameskip
@@ -65,7 +66,7 @@ class MissileEnv0(gym.Env):
                 # reward += -self.wrap.rocket.distanceToTarget*1/(18000/20)+20 #100*np.exp(-1/4000*self.wrap.rocket.distanceToTarget)
                 break
 
-        ob = self.get_obs
+        ob = np.array(self.get_obs)
         
         if self.wrap.rocket.destroyed:
             target_hitted = True
