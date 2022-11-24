@@ -102,8 +102,6 @@ class MissileEnv0(gym.Env):
     def actionsForK(self, coefficients):
         over = self.wrap.rocket.proportionalCoefficients(coefficients[0],
                                                          coefficients[1])
-
-
 # m = MissileEnv0()
 #
 # log = []
@@ -128,7 +126,6 @@ class MissileEnv0(gym.Env):
 #     print(m.wrap.distance_to_target)
 #     if done:
 #         break
-#
 #
 # print("Reward = ", reward)
 # log = np.array(log)
