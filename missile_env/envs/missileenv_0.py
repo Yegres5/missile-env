@@ -102,8 +102,6 @@ class MissileEnv0(gym.Env):
     def actionsForK(self, coefficients):
         over = self.wrap.rocket.proportionalCoefficients(coefficients[0],
                                                          coefficients[1])
-
-
 # m = MissileEnv0()
 #
 # log = []
