@@ -129,7 +129,6 @@ class MissileEnv0(gym.Env):
 #     if done:
 #         break
 #
-#
 # print("Reward = ", reward)
 # log = np.array(log)
 #
