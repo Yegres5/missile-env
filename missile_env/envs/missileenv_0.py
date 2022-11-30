@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import sys
 import yappi
 
-
 def to_ram(wrap):
     # ram_size = wrap.getRAMSize()
     # ram = np.zeros(ram_size, dtype=object)
